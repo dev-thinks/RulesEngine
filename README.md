@@ -1,7 +1,5 @@
 # Rules Engine
-![build](https://github.com/microsoft/RulesEngine/workflows/build/badge.svg?branch=master)
-[![Coverage Status](https://coveralls.io/repos/github/microsoft/RulesEngine/badge.svg?branch=master)](https://coveralls.io/github/microsoft/RulesEngine?branch=master)
-[![Nuget download][download-image]][download-url]
+Forked from https://github.com/microsoft/RulesEngine
 
 [download-image]: https://img.shields.io/nuget/dt/RulesEngine
 [download-url]: https://www.nuget.org/packages/RulesEngine/
