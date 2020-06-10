@@ -8,7 +8,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace RulesEngine.Models
 {
     /// <summary>
-    /// Rule result class with child result heirarchy
+    /// Rule result class with child result hierarchy
     /// </summary>
     [ExcludeFromCodeCoverage]
     public class RuleResultTree
@@ -69,12 +69,13 @@ namespace RulesEngine.Models
     public class RuleResultMessage
     {
         /// <summary>
-        /// Constructor will innitilaze the List 
+        /// Constructor will initialize the List 
         /// </summary>
         public RuleResultMessage()
         {
             ErrorMessages = new List<string>();
             WarningMessages = new List<string>();
+            SuccessRuleNames = new List<string>();
         }
 
         /// <summary>
@@ -86,5 +87,10 @@ namespace RulesEngine.Models
         /// This will hold the list of warning messages
         /// </summary>
         public List<string> WarningMessages { get; set; }
+
+        /// <summary>
+        /// This will hold the list of success rule names
+        /// </summary>
+        public List<string> SuccessRuleNames { get; set; }
     }
 }

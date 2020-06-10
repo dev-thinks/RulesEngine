@@ -1,59 +1,73 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using FluentValidation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Newtonsoft.Json;
+using RulesEngine.Exceptions;
 using RulesEngine.HelperFunctions;
 using RulesEngine.Interfaces;
 using RulesEngine.Models;
 using RulesEngine.Validators;
-using RulesEngine.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Newtonsoft.Json;
-using FluentValidation;
+using System.Threading.Tasks;
 
 namespace RulesEngine
 {
+    /// <inheritdoc />
     public class RulesEngine : IRulesEngine
     {
-        #region Variables
+        private readonly WorkflowRules[] _workflowRules;
         private readonly ILogger _logger;
         private readonly ReSettings _reSettings;
         private readonly RulesCache _rulesCache = new RulesCache();
-        #endregion
 
-        #region Constructor
-        public RulesEngine(string[] jsonConfig, ILogger logger, ReSettings reSettings = null) : this(logger, reSettings)
+        /// <summary>
+        /// .ctor
+        /// </summary>
+        /// <param name="jsonConfig"></param>
+        /// <param name="logger"></param>
+        /// <param name="reSettings"></param>
+        public RulesEngine(string[] jsonConfig, ILogger logger, ReSettings reSettings = null) : this(logger, reSettings: reSettings)
         {
-            var workflowRules = jsonConfig.Select(item => JsonConvert.DeserializeObject<WorkflowRules>(item)).ToArray();
+            var workflowRules = jsonConfig.Select(JsonConvert.DeserializeObject<WorkflowRules>).ToArray();
+
+            _workflowRules = workflowRules;
+
             AddWorkflow(workflowRules);
         }
 
-        public RulesEngine(WorkflowRules[] workflowRules, ILogger logger, ReSettings reSettings = null) : this(logger, reSettings)
+        /// <summary>
+        /// .ctor
+        /// </summary>
+        /// <param name="workflowRules"></param>
+        /// <param name="logger"></param>
+        /// <param name="reSettings"></param>
+        public RulesEngine(WorkflowRules[] workflowRules, ILogger logger, ReSettings reSettings = null) : this(logger, workflowRules, reSettings)
         {
             AddWorkflow(workflowRules);
         }
 
-        public RulesEngine(ILogger logger, ReSettings reSettings = null)
+        /// <summary>
+        /// base .ctor
+        /// </summary>
+        /// <param name="logger"></param>
+        /// <param name="workflowRules"></param>
+        /// <param name="reSettings"></param>
+        public RulesEngine(ILogger logger, WorkflowRules[] workflowRules = null, ReSettings reSettings = null)
         {
+            _workflowRules = workflowRules;
             _logger = logger ?? new NullLogger<RulesEngine>();
             _reSettings = reSettings ?? new ReSettings();
         }
-        #endregion
 
-        #region Public Methods
-
-        /// <summary>
-        /// This will execute all the rules of the specified workflow
-        /// </summary>
-        /// <param name="workflowName">The name of the workflow with rules to execute against the inputs</param>
-        /// <param name="inputs">A variable number of inputs</param>
-        /// <returns>List of rule results</returns>
+        /// <inheritdoc />
         public List<RuleResultTree> ExecuteRule(string workflowName, params object[] inputs)
         {
-            _logger.LogTrace($"Called ExecuteRule for workflow {workflowName} and count of input {inputs.Count()}");
+            _logger.LogTrace("Called ExecuteRule for workflow {WorkflowName} and count of input {Inputs}", workflowName, inputs.Length);
 
             var ruleParams = new List<RuleParameter>();
 
@@ -67,43 +81,55 @@ namespace RulesEngine
             return ExecuteRule(workflowName, ruleParams.ToArray());
         }
 
-        /// <summary>
-        /// This will execute all the rules of the specified workflow
-        /// </summary>
-        /// <param name="workflowName">The name of the workflow with rules to execute against the inputs</param>
-        /// <param name="ruleParams">A variable number of rule parameters</param>
-        /// <returns>List of rule results</returns>
+        /// <inheritdoc />
         public List<RuleResultTree> ExecuteRule(string workflowName, params RuleParameter[] ruleParams)
         {
             return ValidateWorkflowAndExecuteRule(workflowName, ruleParams);
         }
 
-        #endregion
-
-        #region Private Methods
-
-        public void AddWorkflow(params WorkflowRules[] workflowRules)
+        /// <inheritdoc />
+        public async Task<List<RuleResultTree>> ResolveAndExecuteRule(string workflowName, params object[] inputs)
         {
-            try
+            foreach (var wk in _workflowRules)
             {
-                foreach (var workflowRule in workflowRules)
+                if (wk.Rules == null) continue;
+
+                foreach (var wkRule in wk.Rules)
                 {
-                    var validator = new WorkflowRulesValidator();
-                    validator.ValidateAndThrow(workflowRule);
-                    _rulesCache.AddOrUpdateWorkflowRules(workflowRule.WorkflowName, workflowRule);
+                    if (wkRule.Endpoints.Count > 0)
+                    {
+                        foreach (var apiInputConfig in wkRule.Endpoints)
+                        {
+                            var response = await ApiHelper.Get<dynamic>(apiInputConfig.Uri);
+
+                            var expressionName = apiInputConfig.ExpressionName;
+
+                            var dynamicValue = ((IDictionary<string, object>) response)
+                                [expressionName.Replace("$", "")].ToString();
+
+                            wkRule.Expression = wkRule.Expression.Replace(expressionName, dynamicValue);
+                        }
+                    }
                 }
             }
-            catch (ValidationException ex)
-            {
-                throw new RuleValidationException(ex.Message, ex.Errors);
-            }
+
+            AddWorkflow(_workflowRules);
+
+            return ExecuteRule(workflowName, inputs);
         }
 
+        /// <summary>
+        /// Clears the workflow
+        /// </summary>
         public void ClearWorkflows()
         {
             _rulesCache.Clear();
         }
 
+        /// <summary>
+        /// Remove workflow from cache
+        /// </summary>
+        /// <param name="workflowNames"></param>
         public void RemoveWorkflow(params string[] workflowNames)
         {
             foreach (var workflowName in workflowNames)
@@ -113,11 +139,32 @@ namespace RulesEngine
         }
 
         /// <summary>
+        /// Adds or updates the workflow
+        /// </summary>
+        /// <param name="workflowRules"></param>
+        private void AddWorkflow(params WorkflowRules[] workflowRules)
+        {
+            try
+            {
+                foreach (var workflowRule in workflowRules)
+                {
+                    var validator = new WorkflowRulesValidator();
+                    validator.ValidateAndThrow(workflowRule);
+
+                    _rulesCache.AddOrUpdateWorkflowRules(workflowRule.WorkflowName, workflowRule);
+                }
+            }
+            catch (ValidationException ex)
+            {
+                throw new RuleValidationException(ex.Message, ex.Errors);
+            }
+        }
+
+        /// <summary>
         /// This will validate workflow rules then call execute method
         /// </summary>
-        /// <typeparam name="T">type of entity</typeparam>
-        /// <param name="input">input</param>
         /// <param name="workflowName">workflow name</param>
+        /// <param name="ruleParams"></param>
         /// <returns>list of rule result set</returns>
         private List<RuleResultTree> ValidateWorkflowAndExecuteRule(string workflowName, RuleParameter[] ruleParams)
         {
@@ -129,19 +176,20 @@ namespace RulesEngine
             }
             else
             {
-                _logger.LogTrace($"Rule config file is not present for the {workflowName} workflow");
+                _logger.LogTrace("Rule config file is not present for the {WorkflowName} workflow", workflowName);
+
                 // if rules are not registered with Rules Engine
                 throw new ArgumentException($"Rule config file is not present for the {workflowName} workflow");
             }
+
             return result;
         }
-
 
         /// <summary>
         /// This will compile the rules and store them to dictionary
         /// </summary>
-        /// <typeparam name="T">type of entity</typeparam>
         /// <param name="workflowName">workflow name</param>
+        /// <param name="ruleParams"></param>
         /// <returns>bool result</returns>
         private bool RegisterRule(string workflowName, params RuleParameter[] ruleParams)
         {
@@ -161,7 +209,8 @@ namespace RulesEngine
                 }
 
                 _rulesCache.AddOrUpdateCompiledRule(compileRulesKey, new CompiledRule() { CompiledRules = lstFunc });
-                _logger.LogTrace($"Rules has been compiled for the {workflowName} workflow and added to dictionary");
+                _logger.LogTrace("Rules has been compiled for the {WorkflowName} workflow and added to dictionary", workflowName);
+
                 return true;
             }
             else
@@ -170,9 +219,15 @@ namespace RulesEngine
             }
         }
 
+        /// <summary>
+        /// Gets compile rule key
+        /// </summary>
+        /// <param name="workflowName"></param>
+        /// <param name="ruleParams"></param>
+        /// <returns></returns>
         private static string GetCompileRulesKey(string workflowName, RuleParameter[] ruleParams)
         {
-            return $"{workflowName}-" + String.Join("-", ruleParams.Select(c => c.Type.Name));
+            return $"{workflowName}-" + string.Join("-", ruleParams.Select(c => c.Type.Name));
         }
 
         /// <summary>
@@ -183,11 +238,12 @@ namespace RulesEngine
         /// <returns>list of rule result set</returns>
         private List<RuleResultTree> ExecuteRuleByWorkflow(string workflowName, RuleParameter[] ruleParams)
         {
-            _logger.LogTrace($"Compiled rules found for {workflowName} workflow and executed");
+            _logger.LogTrace("Compiled rules found for {WorkflowName} workflow and executed", workflowName);
 
             List<RuleResultTree> result = new List<RuleResultTree>();
             var compileRulesKey = GetCompileRulesKey(workflowName, ruleParams);
             var inputs = ruleParams.Select(c => c.Value);
+
             foreach (var compiledRule in _rulesCache.GetCompiledRules(compileRulesKey).CompiledRules)
             {
                 result.Add(compiledRule.DynamicInvoke(new List<object>(inputs) { new RuleInput() }.ToArray()) as RuleResultTree);
@@ -195,6 +251,5 @@ namespace RulesEngine
 
             return result;
         }
-        #endregion
     }
 }

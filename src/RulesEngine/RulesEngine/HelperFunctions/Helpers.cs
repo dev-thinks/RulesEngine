@@ -103,11 +103,17 @@ namespace RulesEngine.HelperFunctions
                         ruleResultMessage.WarningMessages.Add(errMsg);
                     }
                 }
+                else
+                {
+                    var messages = ruleResultTree.Rule.RuleName;
+
+                    ruleResultMessage.SuccessRuleNames.Add(messages);
+                }
             }
         }
 
         /// <summary>
-        /// To get the child error message recersivly
+        /// To get the child error message recursively
         /// </summary>
         /// <param name="childResultTree">childResultTree</param>
         /// <param name="ruleResultMessage">ruleResultMessage</param>
