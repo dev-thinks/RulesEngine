@@ -1,0 +1,13 @@
+  {
+    "WorkflowName": "inputWorkflow",
+    "Rules": [
+      {
+        "RuleName": "FirstNameIsNotEmpty",
+        "SuccessEvent": "10",
+        "ErrorMessage": "First Name is null or empty OR Age is less than 20.",
+        "ErrorType": "Error",
+        "RuleExpressionType": "LambdaExpression",
+        "Expression": "input1.FirstName != \"\" AND input1.Age > 20"
+      }
+    ]
+  }
