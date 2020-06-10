@@ -100,12 +100,24 @@ namespace RulesEngine
                     {
                         foreach (var apiInputConfig in wkRule.Endpoints)
                         {
-                            var response = await ApiHelper.Get<dynamic>(apiInputConfig.Uri);
-
+                            string dynamicValue;
                             var expressionName = apiInputConfig.ExpressionName;
 
-                            var dynamicValue = ((IDictionary<string, object>) response)
-                                [expressionName.Replace("$", "")].ToString();
+                            try
+                            {
+                                var response = await ApiHelper.Get<dynamic>(apiInputConfig.Uri);
+
+                                dynamicValue = ((IDictionary<string, object>) response)
+                                    [expressionName.Replace("$", "")].ToString();
+                            }
+                            catch (Exception e)
+                            {
+                                _logger.LogError(e,
+                                    "Ensure Api response has a field matches with ExpressionName: {RuleName}",
+                                    wkRule.RuleName);
+
+                                dynamicValue = "API_ERROR";
+                            }
 
                             wkRule.Expression = wkRule.Expression.Replace(expressionName, dynamicValue);
                         }
