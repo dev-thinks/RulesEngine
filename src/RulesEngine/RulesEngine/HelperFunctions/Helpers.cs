@@ -102,12 +102,12 @@ namespace RulesEngine.HelperFunctions
                     {
                         ruleResultMessage.WarningMessages.Add(errMsg);
                     }
-                    else
-                    {
-                        var messages = ruleResultTree.Rule.RuleName;
+                }
+                else
+                {
+                    var messages = ruleResultTree.Rule.RuleName;
 
-                        ruleResultMessage.SuccessRuleNames.Add(messages);
-                    }
+                    ruleResultMessage.SuccessRuleNames.Add(messages);
                 }
             }
         }

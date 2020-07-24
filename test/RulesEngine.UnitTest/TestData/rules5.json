@@ -8,11 +8,11 @@
       "Expression": "input1.FirstName != \"$description\" AND input1.Age > $value",
       "Endpoints": [
         {
-          "Uri": "https://localhost:5001/api/systemsettings/get?code=FORGOT_PWD_EXPIRY_PERIOD",
+          "Uri": "https://localhost:5015/api/systemsetting/get?code=RESET_USERPWD_PERIOD",
           "ExpressionName": "$value"
         },
         {
-          "Uri": "https://localhost:5001/api/systemsettings/get?code=FORGOT_PWD_EXPIRY_PERIOD",
+          "Uri": "https://localhost:5015/api/systemsetting/get?code=RESET_USERPWD_PERIOD",
           "ExpressionName": "$description"
         }
       ]
@@ -24,7 +24,7 @@
       "Expression": "input1.Sex == \"F\" AND input1.Addresses[0].State == \"$value\"",
       "Endpoints": [
         {
-          "Uri": "https://localhost:5001/api/systemsettings/get?code=EMAIL_FROM",
+          "Uri": "https://localhost:5015/api/systemsetting/get?code=EMAIL_FROM",
           "ExpressionName": "$value"
         }
       ]

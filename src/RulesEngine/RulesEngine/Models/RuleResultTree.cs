@@ -83,6 +83,7 @@ namespace RulesEngine.Models
         {
             ErrorMessages = new List<string>();
             WarningMessages = new List<string>();
+            SuccessRuleNames = new List<string>();
         }
 
         /// <summary>
