@@ -11,6 +11,7 @@ using RulesEngine.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using FluentValidation;
 
@@ -19,25 +20,30 @@ namespace RulesEngine
     public class RulesEngine : IRulesEngine
     {
         #region Variables
+        private readonly WorkflowRules[] _workflowRules;
         private readonly ILogger _logger;
         private readonly ReSettings _reSettings;
         private readonly RulesCache _rulesCache = new RulesCache();
         #endregion
 
         #region Constructor
-        public RulesEngine(string[] jsonConfig, ILogger logger, ReSettings reSettings = null) : this(logger, reSettings)
+        public RulesEngine(string[] jsonConfig, ILogger logger, ReSettings reSettings = null) : this(logger, reSettings: reSettings)
         {
-            var workflowRules = jsonConfig.Select(item => JsonConvert.DeserializeObject<WorkflowRules>(item)).ToArray();
+            var workflowRules = jsonConfig.Select(JsonConvert.DeserializeObject<WorkflowRules>).ToArray();
+
+            _workflowRules = workflowRules;
+
             AddWorkflow(workflowRules);
         }
 
-        public RulesEngine(WorkflowRules[] workflowRules, ILogger logger, ReSettings reSettings = null) : this(logger, reSettings)
+        public RulesEngine(WorkflowRules[] workflowRules, ILogger logger, ReSettings reSettings = null) : this(logger, workflowRules, reSettings)
         {
             AddWorkflow(workflowRules);
         }
 
-        public RulesEngine(ILogger logger, ReSettings reSettings = null)
+        public RulesEngine(ILogger logger, WorkflowRules[] workflowRules = null, ReSettings reSettings = null)
         {
+            _workflowRules = workflowRules;
             _logger = logger ?? new NullLogger<RulesEngine>();
             _reSettings = reSettings ?? new ReSettings();
         }
@@ -53,7 +59,7 @@ namespace RulesEngine
         /// <returns>List of rule results</returns>
         public List<RuleResultTree> ExecuteRule(string workflowName, params object[] inputs)
         {
-            _logger.LogTrace($"Called ExecuteRule for workflow {workflowName} and count of input {inputs.Count()}");
+            _logger.LogTrace("Called ExecuteRule for workflow {WorkflowName} and count of input {Inputs}", workflowName, inputs.Length);
 
             var ruleParams = new List<RuleParameter>();
 
@@ -76,6 +82,49 @@ namespace RulesEngine
         public List<RuleResultTree> ExecuteRule(string workflowName, params RuleParameter[] ruleParams)
         {
             return ValidateWorkflowAndExecuteRule(workflowName, ruleParams);
+        }
+
+        /// <inheritdoc />
+        public async Task<List<RuleResultTree>> ResolveAndExecuteRule(string workflowName, params object[] inputs)
+        {
+            foreach (var wk in _workflowRules)
+            {
+                if (wk.Rules == null) continue;
+
+                foreach (var wkRule in wk.Rules)
+                {
+                    if (wkRule.Endpoints.Count > 0)
+                    {
+                        foreach (var apiInputConfig in wkRule.Endpoints)
+                        {
+                            string dynamicValue;
+                            var expressionName = apiInputConfig.ExpressionName;
+
+                            try
+                            {
+                                var response = await ApiHelper.Get<dynamic>(apiInputConfig.Uri);
+
+                                dynamicValue = ((IDictionary<string, object>)response)
+                                    [expressionName.Replace("$", "")].ToString();
+                            }
+                            catch (Exception e)
+                            {
+                                _logger.LogError(e,
+                                    "Ensure Api response has a field matches with ExpressionName: {RuleName}",
+                                    wkRule.RuleName);
+
+                                dynamicValue = "API_ERROR";
+                            }
+
+                            wkRule.Expression = wkRule.Expression.Replace(expressionName, dynamicValue);
+                        }
+                    }
+                }
+            }
+
+            AddWorkflow(_workflowRules);
+
+            return ExecuteRule(workflowName, inputs);
         }
 
         #endregion

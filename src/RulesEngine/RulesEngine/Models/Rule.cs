@@ -54,7 +54,7 @@ namespace RulesEngine.Models
         /// The type of the rule expression.
         /// </value>
         [JsonConverter(typeof(StringEnumConverter))]
-        public RuleExpressionType? RuleExpressionType { get; set; }
+        public RuleExpressionType? RuleExpressionType { get; set; } = Models.RuleExpressionType.LambdaExpression;
 
 
         /// <summary>
@@ -76,7 +76,15 @@ namespace RulesEngine.Models
         public string Expression { get; set; }
 
 
+        /// <summary>
+        /// Success event
+        /// </summary>
         public string SuccessEvent { get; set; }
+
+        /// <summary>
+        /// Api endpoints to get and assign the expression with dynamic value
+        /// </summary>
+        public List<ApiInputConfig> Endpoints { get; set; }
 
     }
 
