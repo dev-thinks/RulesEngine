@@ -51,7 +51,7 @@ namespace DemoApp
                 discountOffered = $"Discount offered is {eventName} % over MRP.";
             });
 
-            resultList.OnFail(() =>
+            resultList.OnFail((failedRules) =>
             {
                 discountOffered = "The user is not eligible for any discount.";
             });
