@@ -15,16 +15,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace RulesEngine
 {
     /// <summary>
     /// 
     /// </summary>
-    /// <seealso cref="RulesEngine.Interfaces.IRulesEngine" />
+    /// <seealso cref="IRulesEngine" />
     public class RulesEngine : IRulesEngine
     {
         #region Variables
+
+        private readonly WorkflowRules[] _workflowRules;
 
         /// <summary>
         /// The logger
@@ -58,19 +61,23 @@ namespace RulesEngine
         #endregion
 
         #region Constructor
-        public RulesEngine(string[] jsonConfig, ILogger logger, ReSettings reSettings = null) : this(logger, reSettings)
+        public RulesEngine(string[] jsonConfig, ILogger logger, ReSettings reSettings = null) : this(logger, reSettings: reSettings)
         {
-            var workflowRules = jsonConfig.Select(item => JsonConvert.DeserializeObject<WorkflowRules>(item)).ToArray();
+            var workflowRules = jsonConfig.Select(JsonConvert.DeserializeObject<WorkflowRules>).ToArray();
+
+            _workflowRules = workflowRules;
+
             AddWorkflow(workflowRules);
         }
 
-        public RulesEngine(WorkflowRules[] workflowRules, ILogger logger, ReSettings reSettings = null) : this(logger, reSettings)
+        public RulesEngine(WorkflowRules[] workflowRules, ILogger logger, ReSettings reSettings = null) : this(logger, workflowRules, reSettings)
         {
             AddWorkflow(workflowRules);
         }
 
-        public RulesEngine(ILogger logger, ReSettings reSettings = null)
+        public RulesEngine(ILogger logger, WorkflowRules[] workflowRules = null, ReSettings reSettings = null)
         {
+            _workflowRules = workflowRules;
             _logger = logger ?? new NullLogger<RulesEngine>();
             _reSettings = reSettings ?? new ReSettings();
             ruleParamCompiler = new ParamCompiler(new RuleExpressionBuilderFactory(_reSettings), _logger);
@@ -109,6 +116,49 @@ namespace RulesEngine
         public List<RuleResultTree> ExecuteRule(string workflowName, params RuleParameter[] ruleParams)
         {
             return ValidateWorkflowAndExecuteRule(workflowName, ruleParams);
+        }
+
+        /// <inheritdoc />
+        public async Task<List<RuleResultTree>> ResolveAndExecuteRule(string workflowName, params object[] inputs)
+        {
+            foreach (var wk in _workflowRules)
+            {
+                if (wk.Rules == null) continue;
+
+                foreach (var wkRule in wk.Rules)
+                {
+                    if (wkRule.Endpoints.Count > 0)
+                    {
+                        foreach (var apiInputConfig in wkRule.Endpoints)
+                        {
+                            string dynamicValue;
+                            var expressionName = apiInputConfig.ExpressionName;
+
+                            try
+                            {
+                                var response = await ApiHelper.Get<dynamic>(apiInputConfig.Uri);
+
+                                dynamicValue = ((IDictionary<string, object>)response)
+                                    [expressionName.Replace("$", "")].ToString();
+                            }
+                            catch (Exception e)
+                            {
+                                _logger.LogError(e,
+                                    "Ensure Api response has a field matches with ExpressionName: {RuleName}",
+                                    wkRule.RuleName);
+
+                                dynamicValue = "API_ERROR";
+                            }
+
+                            wkRule.Expression = wkRule.Expression.Replace(expressionName, dynamicValue);
+                        }
+                    }
+                }
+            }
+
+            AddWorkflow(_workflowRules);
+
+            return ExecuteRule(workflowName, inputs);
         }
 
         #endregion

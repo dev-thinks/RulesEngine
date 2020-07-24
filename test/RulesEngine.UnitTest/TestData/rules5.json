@@ -1,0 +1,33 @@
+﻿{
+  "WorkflowName": "personValidation",
+  "Rules": [
+    {
+      "RuleName": "FirstNameIsNotEmpty",
+      "ErrorMessage": "First Name is null or empty OR Age is less than 3.",
+      "ErrorType": "Error",
+      "Expression": "input1.FirstName != \"$description\" AND input1.Age > $value",
+      "Endpoints": [
+        {
+          "Uri": "https://localhost:5001/api/systemsettings/get?code=FORGOT_PWD_EXPIRY_PERIOD",
+          "ExpressionName": "$value"
+        },
+        {
+          "Uri": "https://localhost:5001/api/systemsettings/get?code=FORGOT_PWD_EXPIRY_PERIOD",
+          "ExpressionName": "$description"
+        }
+      ]
+    },
+    {
+      "RuleName": "StateValidation",
+      "ErrorMessage": "Is not Male OR State validation fails.",
+      "ErrorType": "Error",
+      "Expression": "input1.Sex == \"F\" AND input1.Addresses[0].State == \"$value\"",
+      "Endpoints": [
+        {
+          "Uri": "https://localhost:5001/api/systemsettings/get?code=EMAIL_FROM",
+          "ExpressionName": "$value"
+        }
+      ]
+    }
+  ]
+}

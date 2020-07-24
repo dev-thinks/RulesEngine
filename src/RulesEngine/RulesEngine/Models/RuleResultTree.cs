@@ -94,5 +94,11 @@ namespace RulesEngine.Models
         /// This will hold the list of warning messages
         /// </summary>
         public List<string> WarningMessages { get; set; }
+
+
+        /// <summary>
+        /// This will hold the list of success rule names
+        /// </summary>
+        public List<string> SuccessRuleNames { get; set; }
     }
 }
