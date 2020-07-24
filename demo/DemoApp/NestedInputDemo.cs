@@ -55,7 +55,7 @@ namespace DemoApp
                 resultList.OnSuccess((eventName) =>
                 {
                     Console.WriteLine($"{workflow.WorkflowName} evaluation resulted in succees - {eventName}");
-                }).OnFail(() =>
+                }).OnFail((failedRules) =>
                 {
                     Console.WriteLine($"{workflow.WorkflowName} evaluation resulted in failure");
                 });
